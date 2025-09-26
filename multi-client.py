@@ -1,5 +1,6 @@
 import sys
 import os
+import re
 from prompt_toolkit import *
 from prompt_toolkit.history import *
 from prompt_toolkit.patch_stdout import patch_stdout
@@ -48,38 +49,38 @@ class Client:
             /msg username message
             /msgOpen username
             /msgClose username
-            /name newname
             /help
         """
 
-        split = input.split()
-        command = split[0]
+        match = re.match(r"^(/\w+)\s*(.*)", input)
+
+        if not match:
+            print_formatted_text(ANSI("\033[31mThis is not a valid command"))
+            return
+
+        command = match.group(1)
+        args = match.group(2)  
 
         match command:
-            case "/msg":
-                self.msg(input)
-            case "/msgOpen":
-                self.msgOpen(input)
-            case "/msgClose":
-                self.msgClose(input)
+            # case "/msg":
+            #     self.msg(args)
+            # case "/msgOpen":
+            #     self.msgOpen(args)
+            # case "/msgClose":
+            #     self.msgClose(args)
             case "/name":
-                self.change_name(input)
+                self.change_name(args, input)
             case "/leave":
-                self.socket.send(input.encode())
-                self.socket.close()
-                print_formatted_text(ANSI("\033[31mYou have left"))
-                os._exit(0)
-            case "/help":
-                self.help(input)
+                self.leave(input)
+            # case "/help":
+            #     self.help(input)
             case "/users":
                 self.socket.send(input.encode())
             case "/history":
                 self.history()
             case "/clear":
                 os.system("clear")
-            case _:
-                print_formatted_text(ANSI("\033[31mThis is not a valid command"))
-
+    
     def receive_message(self):
         while True:
             message = self.socket.recv(1024).decode()
@@ -95,25 +96,45 @@ class Client:
             print_formatted_text(ANSI(message))
                 
     def get_name(self):
-        name = ""
+        valid = False
         
-        while not name.strip():
+        while not valid:
             name = prompt("Enter your name: ")
 
-            if name == "You":
-                print_formatted_text(ANSI("\033[31mThis is not a valid name"))
-                name = ""
+            valid = self.valid_name(name)
 
         return name
-
-    # def change_name(self, input):
     
+    def valid_name(self, name):
+        pattern = r"[a-zA-Z0-9\s]+"
+
+        if name == "You":
+            print_formatted_text(ANSI("\033[31mThis is not a permitted name"))
+            return False
+        elif not name.strip():
+            print_formatted_text(ANSI("\033[31mName must not be empty"))
+            return False
+        elif not re.fullmatch(pattern, name):
+            print_formatted_text(ANSI("\033[31mName must only contain letters, numbers, or spaces"))
+            return False
+        else:
+            return True
+
+    def leave(self, input):
+        self.socket.send(input.encode())
+        self.socket.close()
+        print_formatted_text(ANSI("\033[31mYou have left"))
+        os._exit(0)
 
     # def msg(self, input):
     # def msgOpen(self, input):
     # def msgClose(self, input):
     # def help(self, input):
 
+    def change_name(self, args, input):
+        if self.valid_name(args):
+            self.socket.send(input.encode())
+            self.name = args.strip()
 
     def users(self, input: str):
         users = input.split("///")[1:]

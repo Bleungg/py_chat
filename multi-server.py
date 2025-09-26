@@ -1,5 +1,6 @@
 import os
 import sys
+import re
 from socket import *
 from threading import Thread
 import time
@@ -83,6 +84,12 @@ class Server:
                     names = [c["name"] for c in self.clients]
                     users = "///".join(names)
                     sock.send(f"/users///{users}".encode()) 
+                elif message.strip() and message.split()[0] == "/name":
+                    split = message.split()[1:]
+                    new_name = " ".join(split)
+                    client["name"] = new_name
+                    self.broadcast_all(f"\033[31m{name} has changed their name to {new_name} [{time}]")
+                    name = new_name
                 else:
                     self.broadcast(client, message)
             except Exception:
