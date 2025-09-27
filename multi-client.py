@@ -87,9 +87,10 @@ class Client:
     def receive_message(self):
         while True:
             message = self.socket.recv(1024).decode()
+            match = re.match(r"/users (.*)", message)
 
-            if message.split("///")[0] == "/users":
-                self.users(message)
+            if match:
+                self.users(match.group(1))
                 continue
             elif not message.strip():
                 print_formatted_text(ANSI("\033[31mServer has now shutdown"))
@@ -141,7 +142,7 @@ class Client:
             self.name = args.strip()
 
     def users(self, input: str):
-        users = input.split("///")[1:]
+        users = input.split("/")
 
         print_formatted_text(ANSI("\033[34mUSERS START: \n"))
 

@@ -127,8 +127,8 @@ class Server:
         sock: socket = client["socket"]
 
         names = [c["name"] for c in self.clients]
-        users = "///".join(names)
-        sock.send(f"/users///{users}".encode()) 
+        users = "/".join(names)
+        sock.send(f"/users {users}".encode()) 
 
     def name(self, new_name, client, time):
         self.broadcast_all(f"\033[31m{client['name']} has changed their name to {new_name} [{time}]")
