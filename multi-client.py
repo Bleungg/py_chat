@@ -54,15 +54,18 @@ class Client:
         match = re.match(r"(/\w+)\s*(.*)", input)
 
         if not match:
-            print_formatted_text(ANSI("\033[31mThis is not a valid command"))
+            self.not_valid_command()
             return
 
         command = match.group(1)
-        args = match.group(2)  
+        args = match.group(2) if match.group(2) != "" else None
 
         match command:
-            # case "/msg":
-            #     self.msg(args)
+            case "/msg":
+                if not args:
+                    self.not_valid_command()
+                else:
+                    self.socket.send(input.encode())
             # case "/msgOpen":
             #     self.msgOpen(args)
             # case "/msgClose":
@@ -70,17 +73,29 @@ class Client:
             case "/name":
                 self.change_name(args, input)
             case "/leave":
-                self.leave(input)
+                if args:
+                    self.not_valid_command()
+                else:
+                    self.leave(input)
             # case "/help":
             #     self.help(input)
             case "/users":
-                self.socket.send(input.encode())
+                if args:
+                    self.not_valid_command()
+                else:
+                    self.socket.send(input.encode())
             case "/history":
                 self.socket.send(input.encode())
             case "/clear":
-                os.system("clear")
+                if args:
+                    self.not_valid_command()
+                else:
+                    os.system("clear")
             case _:
-                print_formatted_text(ANSI("\033[31mThis is not a valid command"))
+                self.not_valid_command()
+
+    def not_valid_command(self):
+        print_formatted_text(ANSI("\033[31mThis is not a valid command"))
     
     def receive_message(self):
         while True:
@@ -110,7 +125,7 @@ class Client:
         return name
     
     def valid_name(self, name):
-        pattern = r"[a-zA-Z0-9\s]+"
+        pattern = r"[a-zA-Z0-9_]+"
 
         if name == "You":
             print_formatted_text(ANSI("\033[31mThis is not a permitted name"))
@@ -119,7 +134,7 @@ class Client:
             print_formatted_text(ANSI("\033[31mName must not be empty"))
             return False
         elif not re.fullmatch(pattern, name):
-            print_formatted_text(ANSI("\033[31mName must only contain letters, numbers, or spaces"))
+            print_formatted_text(ANSI("\033[31mName must only contain letters, numbers, or underscore"))
             return False
         else:
             return True
@@ -130,7 +145,6 @@ class Client:
         print_formatted_text(ANSI("\033[31mYou have left"))
         os._exit(0)
 
-    # def msg(self, input):
     # def msgOpen(self, input):
     # def msgClose(self, input):
     # def help(self, input):
@@ -162,7 +176,7 @@ class Client:
         for line in history:
             print_formatted_text(ANSI(f"\033[34m{line}"))
 
-        print_formatted_text(ANSI("\n \033[34mHISTORY END \n"))
+        print_formatted_text(ANSI("\n\033[34mHISTORY END \n"))
 
 
 PORT = int(sys.argv[1])

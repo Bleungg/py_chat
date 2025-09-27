@@ -39,7 +39,7 @@ class Server:
             inp = input("")
             match = re.match(r"/exit\s*(\d*)", inp)
 
-            if match.group(1) and match.group(1).strip().isdigit():
+            if match and match.group(1) and match.group(1).strip().isdigit():
                 self.shutdown(int(match.group(1)))
             elif match:
                 self.shutdown(5)
@@ -63,14 +63,16 @@ class Server:
     def broadcast_all(self, message):
         disconnected = []
         for client in self.clients[:]:  
+            sock: socket = client["socket"]
             try:
-                client["socket"].send(message.encode())
+                sock.send(message.encode())
             except Exception:
                 disconnected.append(client)
 
         for client in disconnected:
             if client in self.clients:
                 name = client["name"]
+                time = f"[{datetime.now().strftime('%H:%M')}]"
                 self.broadcast(client, f"\033[31m{name} has left the chat! [{time}]")
                 self.clients.remove(client)
             
@@ -83,7 +85,7 @@ class Server:
             try:
                 message = sock.recv(1024).decode()
                 time = f"[{datetime.now().strftime('%H:%M')}]"
-                match = re.match(r"(/leave|/users|/name|/history)\s*(.*)", message)
+                match = re.match(r"(/leave|/users|/name|/history|/msg)\s*(.*)", message)
 
                 if match:
                     self.command(match, client, addr, time)
@@ -109,6 +111,8 @@ class Server:
                 self.name(match.group(2), client, time)
             case "/history":
                 self.history(client, match)
+            case "/msg":
+                self.msg(client, match.group(2), time)
 
     def broadcast(self, sender, message):
         disconnected = []
@@ -123,6 +127,7 @@ class Server:
         for client in disconnected:
             if client in self.clients:
                 name = client["name"]
+                time = f"[{datetime.now().strftime('%H:%M')}]"
                 self.broadcast(client, f"\033[31m{name} has left the chat! [{time}]")
                 self.clients.remove(client)
 
@@ -148,10 +153,13 @@ class Server:
 
     def history(self, client, match: re.Match):
         hist_list = self.hist.get_strings()
+        sock: socket = client["socket"]
 
-        if match.group(2):
-            if not match.group(2).strip().isdigit():
-                client["socket"].send(f"\033[31mNot a valid history command")
+        m: str = match.group(2)
+        if m:
+            if not m.strip().isdigit():
+                time = f"[{datetime.now().strftime('%H:%M')}]"
+                sock.send(f"\033[31mNot a valid history command [{time}]")
                 return
 
             maxStrings = int(match.group(2))
@@ -161,6 +169,46 @@ class Server:
         history = json.dumps(hist_list)
         sock: socket = client["socket"]
         sock.send(f"/history {history}".encode())
+
+    def find_client_by_name(self, name):
+        for client in self.clients:
+            if client["name"] == name:
+                return client
+        return None
+    
+    def is_valid_recipient(self, sender, recipient):
+        time = f"[{datetime.now().strftime('%H:%M')}]"
+        sock: socket = sender["socket"]
+
+        if sender["name"] == recipient:
+            sock.send(f"\033[31mYou can't send private messages to yourself [{time}]".encode())
+            return False
+        
+        exists = self.find_client_by_name(recipient)
+        if not exists:
+            sock.send(f"\033[31mUser '{recipient}' not found [{time}]".encode())
+            return False
+    
+        return True
+
+    def msg(self, sender, args: str, time):
+        recipient_name = args.split()[0]
+        message = " ".join(args.split()[1:])
+
+        if not self.is_valid_recipient(sender, recipient_name):
+            return
+        
+        recipient_sock: socket = self.find_client_by_name(recipient_name)["socket"]
+        sock: socket = sender["socket"]
+    
+        try:
+            formatted_msg = f"\033[33m[From {sender['name']}]: {message} [{time}]"
+            recipient_sock.send(formatted_msg.encode())
+      
+            confirm = f"\033[33m[To {recipient_name}]: {message} [{time}]"
+            sock.send(confirm.encode())
+        except Exception:
+            sock.send(f"\033[31mFailed to send message to {recipient_name} [{time}]".encode())
 
 PORT = int(sys.argv[1])
 
