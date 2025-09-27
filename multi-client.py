@@ -93,6 +93,7 @@ class Client:
                 continue
             elif not message.strip():
                 print_formatted_text(ANSI("\033[31mServer has now shutdown"))
+                os.system("stty sane")
                 self.socket.close()
                 os._exit(0)
             
@@ -127,7 +128,7 @@ class Client:
         self.socket.send(input.encode())
         self.socket.close()
         print_formatted_text(ANSI("\033[31mYou have left"))
-        sys.exit(0)
+        os._exit(0)
 
     # def msg(self, input):
     # def msgOpen(self, input):
