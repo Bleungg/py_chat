@@ -9,6 +9,7 @@ from datetime import datetime
 class Server:
     def __init__(self, HOST, PORT):
         self.socket = socket(AF_INET, SOCK_STREAM)
+        self.socket.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
         self.socket.bind((HOST, PORT))
         self.clients = []
         self.socket.listen(5)
@@ -33,11 +34,11 @@ class Server:
     def server_close(self):
         while True:
             inp = input("")
-            split = inp.split()
+            match = re.match(r"/exit\s*(\d*)", inp)
 
-            if len(split) == 2 and split[0] == "/exit":
-                self.shutdown(int(split[1]))
-            elif input("") == "/exit":
+            if match and len(match.groups()) == 1:
+                self.shutdown(int(match.group(1)))
+            elif match:
                 self.shutdown(5)
 
     def shutdown(self, shut_time):
@@ -67,37 +68,37 @@ class Server:
                 self.clients.remove(client)
             
     def handle_new_client(self, client, addr):
-        name = client["name"]
         sock: socket = client["socket"]
 
         while True:
+            name = client["name"]
+
             try:
                 message = sock.recv(1024).decode()
                 time = f"[{datetime.now().strftime('%H:%M')}]"
-                if message.strip() == "/leave":
-                    self.broadcast(client, f"\033[31m{name} has left the chat! [{time}]")
-                    print("Disconnection from: " + str(addr))
-                    self.clients.remove(client)
-                    sock.close()
-                    break
-                elif message.strip() == "/users":
-                    names = [c["name"] for c in self.clients]
-                    users = "///".join(names)
-                    sock.send(f"/users///{users}".encode()) 
-                elif message.strip() and message.split()[0] == "/name":
-                    split = message.split()[1:]
-                    new_name = " ".join(split)
-                    client["name"] = new_name
-                    self.broadcast_all(f"\033[31m{name} has changed their name to {new_name} [{time}]")
-                    name = new_name
+                match = re.match(r"(/leave|/users|/name)\s*(.*)", message)
+
+                if match:
+                    self.command(match, client, addr, time)
                 else:
                     self.broadcast(client, message)
             except Exception:
-                self.broadcast(client, f"\033[31m{name} has left the chat! [{time}]")
                 if client in self.clients:
+                    self.broadcast(client, f"\033[31m{name} has left the chat! [{time}]")
                     self.clients.remove(client)
                 sock.close()
                 break
+
+    def command(self, match: re.Match, client, addr, time):
+        command = match.group(1)
+
+        match command:
+            case "/leave":
+                self.leave(client, addr, time)
+            case "/users":
+                self.users(client)
+            case "/name":
+                self.name(match.group(2), client, time)
 
     def broadcast(self, sender, message):
         disconnected = []
@@ -112,6 +113,26 @@ class Server:
         for client in disconnected:
             if client in self.clients:
                 self.clients.remove(client)
+
+    def leave(self, client, addr, time):
+        name = client["name"]
+        sock: socket = client["socket"]
+
+        self.broadcast(client, f"\033[31m{name} has left the chat! [{time}]")
+        print("Disconnection from: " + str(addr))
+        self.clients.remove(client)
+        sock.close()
+
+    def users(self, client):
+        sock: socket = client["socket"]
+
+        names = [c["name"] for c in self.clients]
+        users = "///".join(names)
+        sock.send(f"/users///{users}".encode()) 
+
+    def name(self, new_name, client, time):
+        self.broadcast_all(f"\033[31m{client['name']} has changed their name to {new_name} [{time}]")
+        client["name"] = new_name
 
 PORT = int(sys.argv[1])
 

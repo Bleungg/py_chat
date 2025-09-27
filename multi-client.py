@@ -34,8 +34,9 @@ class Client:
                 continue
 
             time = f"[{datetime.now().strftime('%H:%M')}]"
+            match = re.match(r"[/]", usr_input)
 
-            if usr_input.strip()[0] == "/":
+            if match:
                 print(f"\033[AYou: {usr_input} {time}")
                 self.command(usr_input)
             else:
@@ -52,7 +53,7 @@ class Client:
             /help
         """
 
-        match = re.match(r"^(/\w+)\s*(.*)", input)
+        match = re.match(r"(/\w+)\s*(.*)", input)
 
         if not match:
             print_formatted_text(ANSI("\033[31mThis is not a valid command"))
@@ -80,6 +81,8 @@ class Client:
                 self.history()
             case "/clear":
                 os.system("clear")
+            case _:
+                print_formatted_text(ANSI("\033[31mThis is not a valid command"))
     
     def receive_message(self):
         while True:
@@ -124,7 +127,7 @@ class Client:
         self.socket.send(input.encode())
         self.socket.close()
         print_formatted_text(ANSI("\033[31mYou have left"))
-        os._exit(0)
+        sys.exit(0)
 
     # def msg(self, input):
     # def msgOpen(self, input):
