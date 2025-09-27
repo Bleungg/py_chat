@@ -1,10 +1,10 @@
 import sys
 import os
 import re
-from prompt_toolkit import *
-from prompt_toolkit.history import *
-from prompt_toolkit.patch_stdout import patch_stdout
+import json
 from socket import *
+from prompt_toolkit import *
+from prompt_toolkit.patch_stdout import patch_stdout
 from threading import Thread
 from datetime import datetime
 
@@ -13,7 +13,6 @@ class Client:
         self.socket = socket(AF_INET, SOCK_STREAM)
         self.socket.connect((HOST,PORT))
         self.name = self.get_name()
-        self.hist = InMemoryHistory()
         self.session = PromptSession()
 
         self.talk()
@@ -41,7 +40,6 @@ class Client:
                 self.command(usr_input)
             else:
                 message = f"{self.name}: {usr_input} {time}"
-                self.hist.append_string(message)
                 self.socket.send(message.encode())
                 print(f"\033[AYou: {usr_input} {time}")
 
@@ -78,7 +76,7 @@ class Client:
             case "/users":
                 self.socket.send(input.encode())
             case "/history":
-                self.history()
+                self.socket.send(input.encode())
             case "/clear":
                 os.system("clear")
             case _:
@@ -87,18 +85,19 @@ class Client:
     def receive_message(self):
         while True:
             message = self.socket.recv(1024).decode()
-            match = re.match(r"/users (.*)", message)
+            match = re.match(r"(/users|/history) (.*)", message)
 
-            if match:
-                self.users(match.group(1))
-                continue
+            if match and match.group(1) == "/users":
+                self.users(match.group(2))
+            elif match and match.group(1) == "/history":
+                self.history(match.group(2))
             elif not message.strip():
                 print_formatted_text(ANSI("\033[31mServer has now shutdown"))
                 os.system("stty sane")
                 self.socket.close()
                 os._exit(0)
-            
-            print_formatted_text(ANSI(message))
+            else:
+                print_formatted_text(ANSI(message))
                 
     def get_name(self):
         valid = False
@@ -151,8 +150,12 @@ class Client:
         
         print_formatted_text(ANSI("\n \033[34mUSERS END \n"))
 
-    def history(self):
-        history = self.hist.get_strings()
+    def history(self, history_json):
+        try:
+            history = json.loads(history_json)
+        except json.JSONDecodeError:
+            print_formatted_text(ANSI("\033[31mError: Could not parse history"))
+            return
 
         print_formatted_text(ANSI("\033[34mHISTORY START: \n"))
 

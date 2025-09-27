@@ -1,9 +1,11 @@
 import os
 import sys
 import re
-from socket import *
-from threading import Thread
+import json
 import time
+from socket import *
+from prompt_toolkit.history import *
+from threading import Thread
 from datetime import datetime
 
 class Server:
@@ -11,8 +13,9 @@ class Server:
         self.socket = socket(AF_INET, SOCK_STREAM)
         self.socket.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
         self.socket.bind((HOST, PORT))
-        self.clients = []
         self.socket.listen(5)
+        self.clients = []
+        self.hist = InMemoryHistory()
         Thread(target=self.server_close, daemon=True).start()
         print("Server waiting for connection")
 
@@ -36,10 +39,12 @@ class Server:
             inp = input("")
             match = re.match(r"/exit\s*(\d*)", inp)
 
-            if match and len(match.groups()) == 1:
+            if match.group(1) and match.group(1).strip().isdigit():
                 self.shutdown(int(match.group(1)))
             elif match:
                 self.shutdown(5)
+            else:
+                print("Not valid exit command")
 
     def shutdown(self, shut_time):
         curr_time = f" [{datetime.now().strftime('%H:%M')}]"
@@ -49,8 +54,8 @@ class Server:
 
         for client in self.clients[:]:
             client["socket"].close()
-            self.clients.remove(client)
-
+        
+        self.clients.clear()
         self.socket.shutdown(SHUT_RDWR)
         self.socket.close()
         os._exit(0)
@@ -65,6 +70,8 @@ class Server:
 
         for client in disconnected:
             if client in self.clients:
+                name = client["name"]
+                self.broadcast(client, f"\033[31m{name} has left the chat! [{time}]")
                 self.clients.remove(client)
             
     def handle_new_client(self, client, addr):
@@ -76,11 +83,12 @@ class Server:
             try:
                 message = sock.recv(1024).decode()
                 time = f"[{datetime.now().strftime('%H:%M')}]"
-                match = re.match(r"(/leave|/users|/name)\s*(.*)", message)
+                match = re.match(r"(/leave|/users|/name|/history)\s*(.*)", message)
 
                 if match:
                     self.command(match, client, addr, time)
                 else:
+                    self.hist.append_string(message)
                     self.broadcast(client, message)
             except Exception:
                 if client in self.clients:
@@ -99,6 +107,8 @@ class Server:
                 self.users(client)
             case "/name":
                 self.name(match.group(2), client, time)
+            case "/history":
+                self.history(client, match)
 
     def broadcast(self, sender, message):
         disconnected = []
@@ -112,6 +122,8 @@ class Server:
 
         for client in disconnected:
             if client in self.clients:
+                name = client["name"]
+                self.broadcast(client, f"\033[31m{name} has left the chat! [{time}]")
                 self.clients.remove(client)
 
     def leave(self, client, addr, time):
@@ -133,6 +145,22 @@ class Server:
     def name(self, new_name, client, time):
         self.broadcast_all(f"\033[31m{client['name']} has changed their name to {new_name} [{time}]")
         client["name"] = new_name
+
+    def history(self, client, match: re.Match):
+        hist_list = self.hist.get_strings()
+
+        if match.group(2):
+            if not match.group(2).strip().isdigit():
+                client["socket"].send(f"\033[31mNot a valid history command")
+                return
+
+            maxStrings = int(match.group(2))
+            start = max(0, len(hist_list) - maxStrings)
+            hist_list = hist_list[start:]
+
+        history = json.dumps(hist_list)
+        sock: socket = client["socket"]
+        sock.send(f"/history {history}".encode())
 
 PORT = int(sys.argv[1])
 
