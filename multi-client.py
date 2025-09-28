@@ -66,10 +66,6 @@ class Client:
                     self.not_valid_command()
                 else:
                     self.socket.send(input.encode())
-            # case "/msgOpen":
-            #     self.msgOpen(args)
-            # case "/msgClose":
-            #     self.msgClose(args)
             case "/name":
                 self.change_name(args, input)
             case "/leave":
@@ -145,8 +141,6 @@ class Client:
         print_formatted_text(ANSI("\033[31mYou have left"))
         os._exit(0)
 
-    # def msgOpen(self, input):
-    # def msgClose(self, input):
     # def help(self, input):
 
     def change_name(self, args, input):
