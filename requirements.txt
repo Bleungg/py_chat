@@ -1,0 +1,2 @@
+prompt_toolkit==3.0.52
+regex==2025.9.18
