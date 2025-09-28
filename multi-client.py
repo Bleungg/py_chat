@@ -44,13 +44,6 @@ class Client:
                 print(f"\033[AYou: {usr_input} {time}")
 
     def command(self, input: str):
-        """
-            /msg username message
-            /msgOpen username
-            /msgClose username
-            /help
-        """
-
         match = re.match(r"(/\w+)\s*(.*)", input)
 
         if not match:
@@ -73,8 +66,11 @@ class Client:
                     self.not_valid_command()
                 else:
                     self.leave(input)
-            # case "/help":
-            #     self.help(input)
+            case "/help":
+                if args:
+                    self.not_valid_command()
+                else:
+                    self.help()
             case "/users":
                 if args:
                     self.not_valid_command()
@@ -123,11 +119,11 @@ class Client:
     def valid_name(self, name):
         pattern = r"[a-zA-Z0-9_]+"
 
-        if name == "You":
-            print_formatted_text(ANSI("\033[31mThis is not a permitted name"))
-            return False
-        elif not name.strip():
+        if not name or not name.strip():
             print_formatted_text(ANSI("\033[31mName must not be empty"))
+            return False
+        elif name == "You":
+            print_formatted_text(ANSI("\033[31mThis is not a permitted name"))
             return False
         elif not re.fullmatch(pattern, name):
             print_formatted_text(ANSI("\033[31mName must only contain letters, numbers, or underscore"))
@@ -141,7 +137,16 @@ class Client:
         print_formatted_text(ANSI("\033[31mYou have left"))
         os._exit(0)
 
-    # def help(self, input):
+    def help(self):
+        print(
+            "\033[34m/msg {username} {message}: Send a private message to a user\n"
+            "\033[34m/name {new_name}: Change your name to new_name\n"
+            "\033[34m/leave: Leave the chat\n"
+            "\033[34m/users: Display a list of users\n"
+            "\033[34m/history {lines}: Display a history of all chat messages, optionally up to lines amount. "
+            "\033[34mIf lines is not specified then displays all history\n"
+            "\033[34m /clear: Clears the chat of all messages and notifications"
+        )
 
     def change_name(self, args, input):
         if self.valid_name(args):

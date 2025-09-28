@@ -29,7 +29,8 @@ class Server:
 
             time = f"[{datetime.now().strftime('%H:%M')}]"
             self.broadcast(client, f"\033[31m{name} has joined the chat! [{time}]")
-            client_socket.send(f"Welcome, {name}! [{time}]".encode())
+            welcome_msg = f"\033[31mWelcome, {name}! Use '/help' to display available commands and usage [{time}]"
+            client_socket.send(welcome_msg.encode())
 
             self.clients.append(client)
             Thread(target=self.handle_new_client, args=(client, addr), daemon=True).start()
@@ -194,12 +195,14 @@ class Server:
     def msg(self, sender, args: str, time):
         recipient_name = args.split()[0]
         message = " ".join(args.split()[1:])
+        sock: socket = sender["socket"]
 
         if not self.is_valid_recipient(sender, recipient_name):
             return
+        elif not message or not message.strip():
+            sock.send(f"\033[31mMessage cannot be empty".encode())
         
         recipient_sock: socket = self.find_client_by_name(recipient_name)["socket"]
-        sock: socket = sender["socket"]
     
         try:
             formatted_msg = f"\033[33m[From {sender['name']}]: {message} [{time}]"
